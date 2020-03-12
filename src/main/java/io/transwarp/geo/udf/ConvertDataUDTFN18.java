@@ -3,37 +3,67 @@ package io.transwarp.geo.udf;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
+import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class ConvertDataUDTF extends GenericUDTF {
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.LONG;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.STRING;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.FLOAT;
 
-  private static final int argsCount = 14;
+public class ConvertDataUDTFN18 extends GenericUDTF {
+
+  private static final int listArgsCount = 10;
   private static final int retCount = 26;
   private Object forwardColObj[] = new Object[retCount];
-  private ObjectInspector[] ois = new ObjectInspector[argsCount];
-  private MergeToStay mergeToStay = new MergeToStay();
+  private ListObjectInspector[] lois = new ListObjectInspector[listArgsCount];
+  private MergeToStayV18 mergeToStay = new MergeToStayV18();
 
   public StructObjectInspector initialize(ObjectInspector[] argOIs) throws UDFArgumentException {
-    if (argOIs.length != argsCount) {
-      throw new IllegalArgumentException("there must be " + argsCount + " parameter for ConvertDataUDTF");
+    if (argOIs.length != listArgsCount + 1) {
+      throw new IllegalArgumentException("there must be " + (listArgsCount + 1) + " parameter for ConvertDataUDTF");
     }
-    ois[0] = PrimitiveObjectInspectorFactory.javaStringObjectInspector;
-    ois[1] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaLongObjectInspector);
-    ois[2] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
-    ois[3] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
-    ois[4] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
-    ois[5] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
-    ois[6] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaFloatObjectInspector);
-    ois[7] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaFloatObjectInspector);
-    ois[8] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
-    ois[9] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
-    ois[10] = ObjectInspectorFactory.getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
+
+    //type检查
+    for (int i = 1; i <= listArgsCount; i++) {
+      if (argOIs[i].getCategory() != (ObjectInspector.Category.LIST)) {
+        throw new UDFArgumentException(new IllegalArgumentException("1-10 parameter must be list type!"));
+      }
+      ListObjectInspector loi = null;
+      if (i == 1) {
+        if (((PrimitiveObjectInspector) ((ListObjectInspector) argOIs[i])
+          .getListElementObjectInspector()).getPrimitiveCategory() != LONG) {
+          throw new IllegalArgumentException("Wrong！ parameter time_list must be long list");
+        }
+      }
+      if (i >= 2 && i <= 5) {
+        if (((PrimitiveObjectInspector) ((ListObjectInspector) argOIs[i])
+          .getListElementObjectInspector()).getPrimitiveCategory() != STRING) {
+          throw new IllegalArgumentException("Wrong！ parameter 2-5 must be string list");
+        }
+      }
+
+      if (i >= 6 && i <= 7) {
+        if (((PrimitiveObjectInspector) ((ListObjectInspector) argOIs[i])
+          .getListElementObjectInspector()).getPrimitiveCategory() != FLOAT) {
+          throw new IllegalArgumentException("Wrong！ parameter 6-7 must be float list");
+        }
+      }
+
+      if (i >= 8 && i <= 10) {
+        if (((PrimitiveObjectInspector) ((ListObjectInspector) argOIs[i])
+          .getListElementObjectInspector()).getPrimitiveCategory() != STRING) {
+          throw new IllegalArgumentException("Wrong！ parameter 8-10 must be string list");
+        }
+      }
+      lois[i - 1] = (ListObjectInspector) argOIs[i];
+    }
 
     List<String> outFieldNames = new ArrayList<String>();
     List<ObjectInspector> outFieldOIs = new ArrayList<ObjectInspector>();
@@ -96,28 +126,23 @@ public class ConvertDataUDTF extends GenericUDTF {
 
   public void process(Object[] obs) throws HiveException {
     String deviceNumber = PrimitiveObjectInspectorFactory.javaStringObjectInspector.getPrimitiveJavaObject(obs[0]);
-    List timeList =  ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaLongObjectInspector).getList(obs[1]);
-    List imei_list = ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector).getList(obs[2]);
-    List imsi_list = ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector).getList(obs[3]);
-    List lac_list = ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector).getList(obs[4]);
-    List ci_list = ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector).getList(obs[5]);
-    List longitude_list = ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaFloatObjectInspector).getList(obs[6]);
-    List latitude_list = ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaFloatObjectInspector).getList(obs[7]);
-    List prov_id_list = ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector).getList(obs[8]);
-    List area_id_list = ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector).getList(obs[9]);
-    List district_id_list = ObjectInspectorFactory.
-      getStandardListObjectInspector(PrimitiveObjectInspectorFactory.javaStringObjectInspector).getList(obs[10]);
-    MergeToStay.ListResult listResult = this.mergeToStay.mergeResult(deviceNumber, timeList, imei_list, imsi_list, lac_list,
+    List timeList =  lois[0].getList(obs[1]);
+    List imei_list = lois[1].getList(obs[2]);
+    List imsi_list = lois[2].getList(obs[3]);
+    List lac_list = lois[3].getList(obs[4]);
+    List ci_list = lois[4].getList(obs[5]);
+    List longitude_list = lois[5].getList(obs[6]);
+    List latitude_list = lois[6].getList(obs[7]);
+    List prov_id_list = lois[7].getList(obs[8]);
+    List area_id_list = lois[8].getList(obs[9]);
+    List district_id_list = lois[9].getList(obs[10]);
+    MergeToStayV18.ListResult listResult = this.mergeToStay.mergeResult(deviceNumber, timeList, imei_list, imsi_list, lac_list,
       ci_list, longitude_list, latitude_list, prov_id_list, area_id_list, district_id_list);
+
+    /*MergeToStay.ListResult listResult = new MergeToStay.ListResult(1);
+    listResult.misidn = "testing";
+    listResult.start_time.add("caoNiMade");
+    listResult.end_time.add("caoNiMade");*/
 
     forwardColObj[0] = listResult.misidn;
     for (int i = 0; i < listResult.length; i++) {
@@ -157,8 +182,8 @@ public class ConvertDataUDTF extends GenericUDTF {
       if (listResult.month_id.size() > i) forwardColObj[24] = listResult.month_id.get(i);
       if (listResult.day_id.size() > i) forwardColObj[25] = listResult.day_id.get(i);
       if (listResult.prov_id.size() > i) forwardColObj[26] = listResult.prov_id.get(i);
+      forward(forwardColObj);
     }
-
   }
 
   public void close() throws HiveException {
